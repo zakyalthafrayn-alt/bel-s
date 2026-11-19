@@ -1,0 +1,393 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bel Otomatis Sekolah</title>
+
+<style>
+* {
+    box-sizing: border-box;
+    font-family: Arial, sans-serif;
+}
+
+body {
+    margin: 0;
+    background: #101827;
+    color: white;
+}
+
+header {
+    background: #17263e;
+    padding: 25px;
+    text-align: center;
+    border-bottom: 3px solid #00bcd4;
+}
+
+header h1 {
+    margin: 0;
+    color: #00e5ff;
+}
+
+.container {
+    max-width: 950px;
+    margin: 25px auto;
+    padding: 15px;
+}
+
+.card {
+    background: #1c2b43;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+}
+
+.clock {
+    font-size: 55px;
+    text-align: center;
+    color: #00e5ff;
+    font-weight: bold;
+}
+
+.date {
+    text-align: center;
+    color: #bbb;
+}
+
+h2 {
+    color: #00e5ff;
+    margin-top: 0;
+}
+
+input, select, button {
+    padding: 12px;
+    border: none;
+    border-radius: 7px;
+    margin: 5px 0;
+}
+
+input, select {
+    background: #eef2f7;
+    width: 100%;
+}
+
+button {
+    cursor: pointer;
+    font-weight: bold;
+    background: #00bcd4;
+    color: #071827;
+}
+
+button:hover {
+    background: #00e5ff;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+th, td {
+    padding: 12px;
+    border-bottom: 1px solid #40516a;
+    text-align: center;
+}
+
+th {
+    color: #00e5ff;
+}
+
+.delete {
+    background: #e53935;
+    color: white;
+}
+
+.status {
+    text-align: center;
+    color: #8affb0;
+    font-weight: bold;
+}
+
+.notice {
+    color: #ffd54f;
+    font-size: 13px;
+}
+
+@media(max-width:600px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .clock {
+        font-size: 40px;
+    }
+
+    table {
+        font-size: 12px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>🔔 BEL OTOMATIS SEKOLAH</h1>
+    <p>Sistem Pengingat Jadwal Sekolah</p>
+</header>
+
+<div class="container">
+
+    <div class="card">
+        <h2 align="center">JAM DIGITAL</h2>
+        <div class="clock" id="clock">00:00:00</div>
+        <div class="date" id="date"></div>
+        <p class="status" id="status">Sistem Siap Digunakan</p>
+    </div>
+
+    <div class="card">
+        <h2>⚙️ Pengaturan Suara</h2>
+
+        <label>Pilih File Suara Bel (MP3/WAV)</label>
+        <input type="file" id="soundFile" accept="audio/*">
+
+        <button onclick="testSound()">▶ TES SUARA</button>
+        <button onclick="enableBell()">AKTIFKAN BEL</button>
+
+        <p class="notice">
+            Pilih file suara terlebih dahulu, lalu tekan Aktifkan Bel.
+        </p>
+
+        <audio id="bellAudio"></audio>
+    </div>
+
+    <div class="card">
+        <h2>➕ Tambah Jadwal Bel</h2>
+
+        <div class="form-grid">
+            <div>
+                <label>Nama Kegiatan</label>
+                <select id="activity">
+                    <option>Bel Masuk</option>
+                    <option>Mulai Pelajaran</option>
+                    <option>Pergantian Pelajaran</option>
+                    <option>Istirahat</option>
+                    <option>Selesai Istirahat</option>
+                    <option>Bel Pulang</option>
+                    <option>Lainnya</option>
+                </select>
+            </div>
+
+            <div>
+                <label>Waktu Bel</label>
+                <input type="time" id="time">
+            </div>
+        </div>
+
+        <button onclick="addSchedule()">+ TAMBAH JADWAL</button>
+    </div>
+
+    <div class="card">
+        <h2>📋 Daftar Jadwal Bel</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>No</th>
+                    <th>Waktu</th>
+                    <th>Kegiatan</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+
+            <tbody id="scheduleList"></tbody>
+        </table>
+    </div>
+
+</div>
+
+<script>
+let schedules = JSON.parse(
+    localStorage.getItem("schoolSchedules") || "[]"
+);
+
+let bellEnabled = false;
+let lastPlayed = "";
+
+const clock = document.getElementById("clock");
+const dateDisplay = document.getElementById("date");
+const statusDisplay = document.getElementById("status");
+const audio = document.getElementById("bellAudio");
+
+// Memuat jadwal
+function saveSchedules() {
+    localStorage.setItem(
+        "schoolSchedules",
+        JSON.stringify(schedules)
+    );
+}
+
+// Jam digital
+function updateClock() {
+    const now = new Date();
+
+    const hours = String(now.getHours()).padStart(2, "0");
+    const minutes = String(now.getMinutes()).padStart(2, "0");
+    const seconds = String(now.getSeconds()).padStart(2, "0");
+
+    clock.textContent = `${hours}:${minutes}:${seconds}`;
+
+    dateDisplay.textContent =
+        now.toLocaleDateString("id-ID", {
+            weekday: "long",
+            day: "numeric",
+            month: "long",
+            year: "numeric"
+        });
+
+    checkSchedule(hours + ":" + minutes, seconds);
+}
+
+// Tambah jadwal
+function addSchedule() {
+    const activity = document.getElementById("activity").value;
+    const time = document.getElementById("time").value;
+
+    if (!time) {
+        alert("Silakan masukkan waktu bel!");
+        return;
+    }
+
+    schedules.push({
+        activity: activity,
+        time: time
+    });
+
+    schedules.sort((a, b) =>
+        a.time.localeCompare(b.time)
+    );
+
+    saveSchedules();
+    renderSchedules();
+
+    document.getElementById("time").value = "";
+}
+
+// Tampilkan jadwal
+function renderSchedules() {
+    const list = document.getElementById("scheduleList");
+    list.innerHTML = "";
+
+    schedules.forEach((item, index) => {
+        const row = document.createElement("tr");
+
+        const number = document.createElement("td");
+        number.textContent = index + 1;
+
+        const time = document.createElement("td");
+        time.textContent = item.time;
+
+        const activity = document.createElement("td");
+        activity.textContent = item.activity;
+
+        const action = document.createElement("td");
+        const button = document.createElement("button");
+
+        button.textContent = "Hapus";
+        button.className = "delete";
+        button.onclick = function() {
+            schedules.splice(index, 1);
+            saveSchedules();
+            renderSchedules();
+        };
+
+        action.appendChild(button);
+
+        row.append(number, time, activity, action);
+        list.appendChild(row);
+    });
+}
+
+// Aktifkan bel
+function enableBell() {
+    if (!audio.src) {
+        alert("Pilih file suara bel terlebih dahulu!");
+        return;
+    }
+
+    audio.play().then(() => {
+        audio.pause();
+        audio.currentTime = 0;
+
+        bellEnabled = true;
+        statusDisplay.textContent = "BEL OTOMATIS AKTIF";
+        alert("Bel otomatis berhasil diaktifkan!");
+    }).catch(() => {
+        alert("Tidak dapat memutar suara. Periksa file audio.");
+    });
+}
+
+// Tes suara
+function testSound() {
+    if (!audio.src) {
+        alert("Pilih file suara terlebih dahulu!");
+        return;
+    }
+
+    audio.currentTime = 0;
+    audio.play();
+}
+
+// Periksa jadwal
+function checkSchedule(currentTime, seconds) {
+    if (seconds !== "00" || !bellEnabled) return;
+
+    const today = new Date().toLocaleDateString("id-ID");
+
+    schedules.forEach(item => {
+        const key = today + "-" + item.time;
+
+        if (item.time === currentTime && lastPlayed !== key) {
+            lastPlayed = key;
+
+            audio.currentTime = 0;
+            audio.play().catch(() => {
+                statusDisplay.textContent =
+                    "Gagal memutar suara bel";
+            });
+
+            statusDisplay.textContent =
+                "🔔 " + item.activity;
+        }
+    });
+}
+
+// Memilih suara
+document.getElementById("soundFile").addEventListener(
+    "change",
+    function() {
+        if (this.files.length > 0) {
+            audio.src = URL.createObjectURL(this.files[0]);
+            audio.load();
+        }
+    }
+);
+
+// Jalankan sistem
+setInterval(updateClock, 250);
+
+updateClock();
+renderSchedules();
+
+</script>
+
+</body>
+</html>
